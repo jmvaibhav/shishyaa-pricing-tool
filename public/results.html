@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shishyaa Pricing — Results (Admin)</title>
+<style>
+  :root {
+    --parchment: #FDF6ED;
+    --forest: #2D5016;
+    --terracotta: #C4622D;
+    --sage: #6B7C5A;
+    --deep-brown: #3D2B1F;
+    --light-sage: #E8EDE0;
+    --cream-card: #FAF3E8;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: 'Segoe UI', Arial, sans-serif; background: var(--parchment); color: var(--deep-brown); }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 28px 20px 80px; }
+  .header { background: var(--forest); color: var(--parchment); padding: 24px; border-radius: 14px; margin-bottom: 22px; }
+  .header h1 { margin: 0 0 6px; font-size: 20px; }
+  .header p { margin: 0; font-size: 13px; color: rgba(253,246,237,0.75); }
+
+  .gate { background: #fff; border-radius: 14px; padding: 24px; box-shadow: 0 3px 14px rgba(61,43,31,0.08); max-width: 420px; margin: 40px auto; }
+  .gate label { font-size: 13px; font-weight: 700; color: var(--forest); display: block; margin-bottom: 8px; }
+  .gate input { width: 100%; padding: 10px 12px; border: 2px solid rgba(107,124,90,0.25); border-radius: 8px; font-size: 14px; margin-bottom: 12px; }
+  .gate button, .toolbar button {
+    background: var(--terracotta); color: #fff; border: none; border-radius: 24px;
+    padding: 10px 22px; font-weight: 700; cursor: pointer; font-size: 13px;
+  }
+
+  .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 10px; }
+  .toolbar .count { font-size: 13px; color: var(--sage); }
+
+  .submission {
+    background: #fff; border-radius: 14px; box-shadow: 0 3px 14px rgba(61,43,31,0.08);
+    padding: 18px 20px; margin-bottom: 16px;
+  }
+  .sub-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; border-bottom: 1px solid var(--light-sage); padding-bottom: 12px; }
+  .sub-name { font-size: 16px; font-weight: 700; color: var(--forest); }
+  .sub-time { font-size: 12px; color: var(--sage); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 6px 8px; color: var(--sage); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--light-sage); }
+  td { padding: 6px 8px; border-bottom: 1px solid rgba(107,124,90,0.08); }
+  .sub-summary { margin-top: 10px; font-size: 13px; color: var(--forest); font-weight: 700; text-align: right; }
+
+  .empty { text-align: center; color: var(--sage); padding: 60px 20px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <h1>Shishyaa Pricing — Results (Admin Only)</h1>
+    <p>All submitted pricing entries appear below, most recent first. Export to CSV to update Razorpay / your webstore.</p>
+  </div>
+
+  <div id="gateBox" class="gate">
+    <label for="accessKey">Enter access key</label>
+    <input type="password" id="accessKey" placeholder="Access key">
+    <button id="unlockBtn">View results</button>
+  </div>
+
+  <div id="resultsBox" style="display:none;">
+    <div class="toolbar">
+      <span class="count" id="countLabel"></span>
+      <button id="exportBtn">Download CSV</button>
+    </div>
+    <div id="submissionsList"></div>
+  </div>
+</div>
+
+<script>
+let allSubmissions = [];
+
+document.getElementById("unlockBtn").addEventListener("click", async () => {
+  const key = document.getElementById("accessKey").value.trim();
+  if (!key) return;
+
+  try {
+    const res = await fetch(`/api/results?key=${encodeURIComponent(key)}`);
+    if (!res.ok) {
+      alert("Incorrect access key.");
+      return;
+    }
+    const data = await res.json();
+    allSubmissions = data.submissions || [];
+    document.getElementById("gateBox").style.display = "none";
+    document.getElementById("resultsBox").style.display = "block";
+    renderSubmissions();
+  } catch (e) {
+    alert("Could not load results. Please try again.");
+  }
+});
+
+function formatRupee(value) {
+  const amount = Number(value) || 0;
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(amount);
+}
+
+function renderSubmissions() {
+  const list = document.getElementById("submissionsList");
+  document.getElementById("countLabel").textContent = `${allSubmissions.length} submission(s)`;
+
+  if (allSubmissions.length === 0) {
+    list.innerHTML = '<div class="empty">No submissions yet.</div>';
+    return;
+  }
+
+  list.innerHTML = allSubmissions.map(sub => {
+    const rows = sub.pricing_data.map(p => `
+      <tr>
+        <td>${p.product_id}</td>
+        <td>${p.product_name}</td>
+        <td>${formatRupee(p.price)}</td>
+        <td>${formatRupee(p.razorpay_fee)}</td>
+        <td>${formatRupee(p.net_realised)}</td>
+      </tr>
+    `).join("");
+
+    return `
+      <div class="submission">
+        <div class="sub-head">
+          <span class="sub-name">${sub.respondent_name}</span>
+          <span class="sub-time">${new Date(sub.timestamp).toLocaleString("en-IN")}</span>
+        </div>
+        <table>
+          <thead><tr><th>ID</th><th>Product</th><th>Price</th><th>Razorpay fee</th><th>Net realised</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <div class="sub-summary">Total: ${formatRupee(sub.summary.total_list_value)} &nbsp;|&nbsp; Fee: ${formatRupee(sub.summary.total_razorpay_fee)} &nbsp;|&nbsp; Net: ${formatRupee(sub.summary.total_net_realised)}</div>
+      </div>
+    `;
+  }).join("");
+}
+
+document.getElementById("exportBtn").addEventListener("click", () => {
+  if (allSubmissions.length === 0) {
+    alert("No submissions to export.");
+    return;
+  }
+
+  const rows = [["Respondent Name", "Submitted At", "Product ID", "Product Name", "Price (INR)", "Razorpay Fee (INR)", "Net Realised (INR)"]];
+  allSubmissions.forEach(sub => {
+    sub.pricing_data.forEach(p => {
+      rows.push([
+        sub.respondent_name,
+        new Date(sub.timestamp).toLocaleString("en-IN"),
+        p.product_id,
+        p.product_name,
+        p.price,
+        p.razorpay_fee,
+        p.net_realised
+      ]);
+    });
+  });
+
+  const csvContent = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  const today = new Date().toISOString().split("T")[0];
+  link.download = `shishyaa-pricing-results-${today}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+});
+</script>
+</body>
+</html>
